@@ -27,14 +27,20 @@ exports.registerUser = async (req, res) => {
 exports.loginUser = async (req, res) => {
   const { correo, contrasena } = req.body;
   try {
-    const user = await Usuario.findOne({ where: { correo } });
+    const user = await Usuario.findOne({
+      where: { correo },
+      include: [
+        { model: Empresa, as: "empresa" },
+        { model: Rol, as: "rol" },
+      ],
+    });
     if (!user || !(await bcrypt.compare(contrasena, user.contrasena))) {
       return res.status(401).json({ message: "Credenciales inválidas" });
     }
     const token = jwt.sign({ id: user.id }, process.env.JWT_SECRET, {
       expiresIn: "30d",
     });
-    res.json({ token });
+    res.json({ token, user });
   } catch (error) {
     res.status(400).json({ error: error.message });
   }
@@ -43,7 +49,12 @@ exports.loginUser = async (req, res) => {
 exports.getUserById = async (req, res) => {
   const { id } = req.params;
   try {
-    const user = await Usuario.findByPk(id);
+    const user = await Usuario.findByPk(id, {
+      include: [
+        { model: Empresa, as: "empresa" },
+        { model: Rol, as: "rol" },
+      ],
+    });
     if (!user) {
       return res.status(404).json({ message: "Usuario no encontrado" });
     }
@@ -131,6 +142,20 @@ exports.addUserToCompany = async (req, res) => {
       updatedAt: new Date(),
     });
     res.status(201).json(user);
+  } catch (error) {
+    res.status(400).json({ error: error.message });
+  }
+};
+
+exports.deleteUserFromCompany = async (req, res) => {
+  const { id } = req.params;
+  try {
+    const user = await Usuario.findByPk(id);
+    if (!user) {
+      return res.status(404).json({ message: "Usuario no encontrado" });
+    }
+    await user.destroy();
+    res.json({ message: "Usuario eliminado" });
   } catch (error) {
     res.status(400).json({ error: error.message });
   }
