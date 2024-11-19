@@ -1,0 +1,10 @@
+{
+    "development": {
+      "username": "postgres",
+      "password": "judimapa6",
+      "database": "sistema_calidad",
+      "host": "127.0.0.1",
+      "dialect": "postgres"
+    }
+  }
+  
