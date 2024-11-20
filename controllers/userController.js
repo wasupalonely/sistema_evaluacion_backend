@@ -5,6 +5,10 @@ const { Usuario, Rol, Empresa } = require("../models");
 exports.registerUser = async (req, res) => {
   const { nombre, correo, contrasena, rol_id } = req.body;
   try {
+    const rol = await Rol.findOne({ where: { nombre: "Administrador" } });
+    if (!rol) {
+      return res.status(404).json({ message: "Error al obtener el rol" });
+    }
     const existingUser = await Usuario.findOne({ where: { correo } });
     if (existingUser) {
       return res.status(400).json({ message: "El correo ya esta registrado" });
@@ -14,7 +18,7 @@ exports.registerUser = async (req, res) => {
       nombre,
       correo,
       contrasena: hashedPassword,
-      rol_id,
+      rol_id: rol.id,
       createdAt: new Date(),
       updatedAt: new Date(),
     });
