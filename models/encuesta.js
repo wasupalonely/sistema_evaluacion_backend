@@ -26,6 +26,7 @@ module.exports = (sequelize, DataTypes) => {
       Encuesta.hasMany(models.Respuesta, {
         foreignKey: "encuesta_id",
         as: "respuestas",
+        onDelete: 'CASCADE',
       });
     }
   }
