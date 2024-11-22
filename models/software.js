@@ -16,6 +16,7 @@ module.exports = (sequelize, DataTypes) => {
       Software.hasMany(models.Encuesta, {
         foreignKey: "software_id",
         as: "encuestas",
+        onDelete: 'CASCADE',
       });
     }
   }

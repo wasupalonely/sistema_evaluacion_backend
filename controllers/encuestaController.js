@@ -10,6 +10,16 @@ const {
   Sequelize,
 } = require("../models");
 
+exports.getAllQualityModels = async (req, res) => {
+  try {
+    const qualityModels = await ModeloCalidad.findAll();
+
+    res.status(200).json(qualityModels);
+  } catch (error) {
+    res.status(400).json({ error: error.message });
+  }
+};
+
 exports.getQualityModelById = async (req, res) => {
   const { modeloId } = req.params;
 
@@ -219,7 +229,7 @@ exports.createRisksQuestionary = async (req, res) => {
 exports.getRisksQuestionary = async (req, res) => {
   try {
     const categorias = await Categoria.findAll({
-      where: { tipo_encuesta_id: { [Sequelize.Op.ne]: null } },
+      where: { modelo_calidad_id: { [Sequelize.Op.eq]: null } },
       include: {
         model: Pregunta,
         as: "preguntas",
