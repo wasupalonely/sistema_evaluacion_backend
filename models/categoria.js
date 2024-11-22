@@ -13,6 +13,11 @@ module.exports = (sequelize, DataTypes) => {
         as: "modelo_calidad",
       });
 
+      Categoria.belongsTo(models.TipoEncuesta, {
+        foreignKey: "tipo_encuesta_id",
+        as: "tipo_encuesta", // Relación para categorías de Riesgos
+      });
+
       Categoria.hasMany(models.Pregunta, {
         foreignKey: "categoria_id",
         as: "preguntas",
@@ -23,6 +28,7 @@ module.exports = (sequelize, DataTypes) => {
     {
       nombre: DataTypes.STRING,
       modelo_calidad_id: DataTypes.INTEGER,
+      tipo_encuesta_id: DataTypes.INTEGER,
     },
     {
       sequelize,

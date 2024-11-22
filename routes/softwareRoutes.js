@@ -6,6 +6,7 @@ const {
   getSoftwareById,
   updateSoftware,
   deleteSoftware,
+  getSofwaresByCompanyAndUser,
 } = require("../controllers/softwareController");
 const router = express.Router();
 
@@ -14,7 +15,7 @@ router.get("/empresa/:id", verifyToken, getSoftwaresByCompany);
 router.get(
   "/empresa/:empresa_id/creador/:creador_id",
   verifyToken,
-  getSoftwaresByCompany
+  getSofwaresByCompanyAndUser
 );
 router.get("/:id", verifyToken, getSoftwareById);
 router.put("/:id", verifyToken, updateSoftware);
