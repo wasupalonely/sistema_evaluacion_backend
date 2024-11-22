@@ -29,14 +29,20 @@ module.exports = (sequelize, DataTypes) => {
       encuesta_id: DataTypes.INTEGER,
       pregunta_id: DataTypes.INTEGER,
       usuario_id: DataTypes.INTEGER,
-      valor: DataTypes.STRING,
+      valor: {
+        type: DataTypes.INTEGER,
+        validate: {
+          min: 1,
+          max: 5,
+        },
+      },
     },
     {
       sequelize,
       modelName: "Respuesta",
       timestamps: true, // Activa createdAt y updatedAt
-      createdAt: 'createdAt', // Sequelize agregará esta columna automáticamente
-      updatedAt: 'updatedAt', // Sequelize agregará esta columna automáticamente
+      createdAt: "createdAt", // Sequelize agregará esta columna automáticamente
+      updatedAt: "updatedAt", // Sequelize agregará esta columna automáticamente
     }
   );
   return Respuesta;
