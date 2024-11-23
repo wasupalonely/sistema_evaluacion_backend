@@ -103,25 +103,9 @@ exports.createQuestionary = async (req, res) => {
   }
 };
 
-exports.answerQuestionary = async (req, res) => {
+exports.answerQualitySurvey = async (req, res) => {
   const { encuestaId } = req.params;
-  const { respuestas, usuarioId } = req.body; // [{ preguntaId, valor }]
-  /*
-
-  {
-    "usuarioId": 1,
-    "respuestas": [
-      {
-        "preguntaId": 1,
-        "valor": 5
-      },
-      {
-        "preguntaId": 2,
-        "valor": 4
-      }
-  }
-
-  */
+  const { respuestas, usuarioId } = req.body;
 
   try {
     const encuesta = await Encuesta.findByPk(encuestaId);
@@ -130,7 +114,6 @@ exports.answerQuestionary = async (req, res) => {
       return res.status(404).json({ error: "Encuesta no encontrada." });
     }
 
-    // Crear las respuestas, asociándolas al usuario
     const respuestasToCreate = respuestas.map((r) => ({
       encuesta_id: encuestaId,
       pregunta_id: r.preguntaId,
@@ -140,10 +123,19 @@ exports.answerQuestionary = async (req, res) => {
 
     await Respuesta.bulkCreate(respuestasToCreate);
 
-    res.status(201).json({ message: "Respuestas guardadas exitosamente." });
+    const promedio =
+      respuestas.reduce((sum, respuesta) => sum + respuesta.valor, 0) /
+      respuestas.length;
+
+    res.status(201).json({
+      message: "Respuestas guardadas exitosamente.",
+      promedioCalidad: promedio.toFixed(2),
+    });
   } catch (error) {
     console.error(error);
-    res.status(500).json({ error: "Error al guardar las respuestas." });
+    res
+      .status(500)
+      .json({ error: "Error al procesar la encuesta de calidad." });
   }
 };
 
@@ -254,80 +246,69 @@ exports.getRisksQuestionary = async (req, res) => {
   }
 };
 
-exports.answerRisksQuestionary = async (req, res) => {
+exports.answerRiskSurvey = async (req, res) => {
   const { encuestaId } = req.params;
-  const { usuarioId, respuestas } = req.body;
+  const { respuestas, usuarioId } = req.body;
 
   try {
-    // Verificar si la encuesta existe y es de riesgos
-    const encuesta = await Encuesta.findOne({
-      where: { id: encuestaId },
-    });
+    const encuesta = await Encuesta.findByPk(encuestaId);
+
     if (!encuesta) {
       return res.status(404).json({ error: "Encuesta no encontrada." });
     }
 
-    // Validar que el usuario existe
-    const usuario = await Usuario.findByPk(usuarioId);
-    if (!usuario) {
-      return res.status(404).json({ error: "Usuario no encontrado." });
-    }
+    const respuestasToCreate = respuestas.map((r) => ({
+      encuesta_id: encuestaId,
+      pregunta_id: r.preguntaId,
+      usuario_id: usuarioId,
+      valor: r.valor,
+    }));
 
-    // Validar las respuestas
-    const respuestasToCreate = [];
-    for (const respuesta of respuestas) {
-      // Verificar que la pregunta pertenece a la encuesta
-      const pregunta = await Pregunta.findOne({
-        where: { id: respuesta.preguntaId },
-        include: {
-          model: Categoria,
-          as: "categoria",
-          where: { tipo_encuesta_id: encuesta.tipo_encuesta_id }, // Asegurar que es de riesgos
-        },
-      });
-
-      if (!pregunta) {
-        return res.status(400).json({
-          error: `La pregunta con ID ${respuesta.preguntaId} no pertenece a esta encuesta.`,
-        });
-      }
-
-      // Validar que el valor esté entre 1 y 5
-      if (respuesta.valor < 1 || respuesta.valor > 5) {
-        return res.status(400).json({
-          error: `El valor para la pregunta ${respuesta.preguntaId} debe estar entre 1 y 5.`,
-        });
-      }
-
-      // Evitar respuestas duplicadas dentro de la misma encuesta
-      const respuestaExistente = await Respuesta.findOne({
-        where: {
-          encuesta_id: encuestaId,
-          pregunta_id: respuesta.preguntaId,
-          usuario_id: usuarioId, // Mismo usuario en la misma encuesta
-        },
-      });
-      if (respuestaExistente) {
-        return res.status(400).json({
-          error: `Ya existe una respuesta para la pregunta ${respuesta.preguntaId} en esta encuesta por el usuario ${usuarioId}.`,
-        });
-      }
-
-      // Agregar respuesta a la lista para creación masiva
-      respuestasToCreate.push({
-        encuesta_id: encuestaId,
-        pregunta_id: respuesta.preguntaId,
-        usuario_id: usuarioId,
-        valor: respuesta.valor,
-      });
-    }
-
-    // Crear todas las respuestas
     await Respuesta.bulkCreate(respuestasToCreate);
 
-    res.status(201).json({ message: "Respuestas guardadas exitosamente." });
+    const resultados = [];
+
+    for (const respuesta of respuestas) {
+      const pregunta = await Pregunta.findByPk(respuesta.preguntaId);
+
+      if (!pregunta) {
+        return res
+          .status(400)
+          .json({ error: `Pregunta con ID ${respuesta.preguntaId} no encontrada.` });
+      }
+
+      const impacto = pregunta.impacto;
+
+      if (!impacto) {
+        return res.status(400).json({
+          error: `Impacto no definido para la pregunta ${respuesta.preguntaId}.`,
+        });
+      }
+
+      const riesgoPregunta =
+        respuesta.valor *
+        (impacto.alcance + impacto.tiempo + impacto.costo + impacto.calidad);
+
+      let nivelRiesgo = "Muy Bajo";
+
+      if (riesgoPregunta > 80) nivelRiesgo = "Muy Alto";
+      else if (riesgoPregunta >= 51) nivelRiesgo = "Alto";
+      else if (riesgoPregunta >= 31) nivelRiesgo = "Medio";
+      else if (riesgoPregunta >= 11) nivelRiesgo = "Bajo";
+
+      resultados.push({
+        preguntaId: respuesta.preguntaId,
+        riesgo: riesgoPregunta,
+        nivelRiesgo,
+      });
+    }
+
+    res.status(201).json({
+      message: "Respuestas guardadas exitosamente.",
+      resultados,
+    });
   } catch (error) {
     console.error(error);
-    res.status(500).json({ error: "Error al guardar las respuestas." });
+    res.status(500).json({ error: "Error al procesar la encuesta de riesgos." });
   }
 };

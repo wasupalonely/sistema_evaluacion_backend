@@ -23,13 +23,24 @@ module.exports = (sequelize, DataTypes) => {
     {
       contenido: DataTypes.TEXT,
       categoria_id: DataTypes.INTEGER,
+      impacto: {
+        type: DataTypes.JSON,
+        allowNull: true,
+        get() {
+          const rawValue = this.getDataValue("impacto");
+          return typeof rawValue === "string" ? JSON.parse(rawValue) : rawValue;
+        },
+        set(value) {
+          this.setDataValue("impacto", JSON.stringify(value));
+        },
+      },
     },
     {
       sequelize,
       modelName: "Pregunta",
       timestamps: true, // Activa createdAt y updatedAt
-      createdAt: 'createdAt', // Sequelize agregará esta columna automáticamente
-      updatedAt: 'updatedAt', // Sequelize agregará esta columna automáticamente
+      createdAt: "createdAt", // Sequelize agregará esta columna automáticamente
+      updatedAt: "updatedAt", // Sequelize agregará esta columna automáticamente
     }
   );
   return Pregunta;
