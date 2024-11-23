@@ -3,12 +3,12 @@ const { verifyToken } = require("../middlewares/authMiddleware");
 const {
   getQualityModelById,
   createQuestionary,
-  answerQuestionary,
   getQuestionaryAnswers,
   getRisksQuestionary,
   createRisksQuestionary,
-  answerRisksQuestionary,
   getAllQualityModels,
+  answerQualitySurvey,
+  answerRiskSurvey,
 } = require("../controllers/encuestaController");
 
 const router = express.Router();
@@ -16,7 +16,7 @@ const router = express.Router();
 // CALIDAD
 router.get("/cuestionario/:modeloId", verifyToken, getQualityModelById);
 router.post("/", verifyToken, createQuestionary);
-router.post("/:encuestaId/respuestas", verifyToken, answerQuestionary);
+router.post("/:encuestaId/respuestas", verifyToken, answerQualitySurvey);
 router.get("/:encuestaId/respuestas", verifyToken, getQuestionaryAnswers);
 router.get("/", verifyToken, getAllQualityModels);
 
@@ -26,7 +26,7 @@ router.post("/riesgos", verifyToken, createRisksQuestionary);
 router.post(
   "/:encuestaId/riesgos/responder",
   verifyToken,
-  answerRisksQuestionary
+  answerRiskSurvey
 );
 
 module.exports = router;
