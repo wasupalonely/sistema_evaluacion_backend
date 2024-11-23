@@ -9,6 +9,10 @@ const {
   Usuario,
   Sequelize,
 } = require("../models");
+const {
+  calcularNivelRiesgo,
+  calcularPromedioCalidad,
+} = require("../utils/calculations");
 
 exports.getAllQualityModels = async (req, res) => {
   try {
@@ -272,9 +276,9 @@ exports.answerRiskSurvey = async (req, res) => {
       const pregunta = await Pregunta.findByPk(respuesta.preguntaId);
 
       if (!pregunta) {
-        return res
-          .status(400)
-          .json({ error: `Pregunta con ID ${respuesta.preguntaId} no encontrada.` });
+        return res.status(400).json({
+          error: `Pregunta con ID ${respuesta.preguntaId} no encontrada.`,
+        });
       }
 
       const impacto = pregunta.impacto;
@@ -309,6 +313,115 @@ exports.answerRiskSurvey = async (req, res) => {
     });
   } catch (error) {
     console.error(error);
-    res.status(500).json({ error: "Error al procesar la encuesta de riesgos." });
+    res
+      .status(500)
+      .json({ error: "Error al procesar la encuesta de riesgos." });
+  }
+};
+
+exports.getSurveyResults = async (req, res) => {
+  const { encuestaId } = req.params;
+
+  try {
+    // Buscar la encuesta por ID
+    const encuesta = await Encuesta.findByPk(encuestaId, {
+      include: [
+        {
+          model: Respuesta,
+          as: "respuestas",
+        },
+      ],
+    });
+
+    if (!encuesta) {
+      return res.status(404).json({ error: "Encuesta no encontrada." });
+    }
+
+    // Validar si hay respuestas asociadas
+    const respuestas = encuesta.respuestas;
+    if (respuestas.length === 0) {
+      return res.status(200).json({
+        encuestaId,
+        usuario_id: null,
+        resultados: [],
+        mensaje: "No hay respuestas registradas para esta encuesta.",
+      });
+    }
+
+    // Obtener el usuario que respondió (mismo para todas las respuestas)
+    const usuario_id = respuestas[0]?.usuario_id;
+
+    const tipoEncuesta = await TipoEncuesta.findByPk(encuesta.tipo_encuesta_id);
+
+    if (!tipoEncuesta) {
+      return res.status(404).json({ error: "Tipo de encuesta no encontrado." });
+    }
+
+    const esEncuestaDeRiesgo = tipoEncuesta?.nombre === "Riesgos";
+
+    if (esEncuestaDeRiesgo) {
+      const preguntasIds = [...new Set(respuestas.map((r) => r.pregunta_id))];
+
+      const resultados = await Promise.all(
+        preguntasIds.map(async (preguntaId) => {
+          const respuestasPregunta = respuestas.filter(
+            (r) => r.pregunta_id === preguntaId
+          );
+
+          // Cargar impacto asociado a la pregunta
+          const pregunta = await Pregunta.findByPk(preguntaId);
+          if (!pregunta) {
+            return {
+              preguntaId,
+              mensaje: "Pregunta no encontrada.",
+            };
+          }
+
+          const impacto = pregunta.impacto;
+          if (!impacto) {
+            return {
+              preguntaId,
+              mensaje: "Impacto no definido para esta pregunta.",
+            };
+          }
+
+          // Calcular riesgo total y nivel de riesgo
+          const riesgos = respuestasPregunta.map((respuesta) =>
+            calcularNivelRiesgo(respuesta.valor, impacto)
+          );
+
+          const totalRiesgo = riesgos.reduce((acc, r) => acc + r.riesgo, 0);
+          const nivelRiesgo =
+            riesgos.length > 0 ? riesgos[0].nivelRiesgo : "Muy Bajo";
+
+          return {
+            preguntaId,
+            respuesta: respuestasPregunta[0].valor,
+            totalRiesgo,
+            nivelRiesgo,
+          };
+        })
+      );
+
+      return res.status(200).json({
+        encuestaId: Number(encuestaId),
+        usuario_id,
+        resultados,
+      });
+    } else {
+      // Proceso para encuestas de calidad
+      const promedioCalidad = calcularPromedioCalidad(respuestas);
+
+      return res.status(200).json({
+        encuestaId: Number(encuestaId),
+        usuario_id,
+        promedioCalidad,
+      });
+    }
+  } catch (error) {
+    console.error(error);
+    res
+      .status(500)
+      .json({ error: "Error al obtener los resultados de la encuesta." });
   }
 };

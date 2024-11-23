@@ -9,6 +9,7 @@ const {
   getAllQualityModels,
   answerQualitySurvey,
   answerRiskSurvey,
+  getSurveyResults,
 } = require("../controllers/encuestaController");
 
 const router = express.Router();
@@ -28,5 +29,8 @@ router.post(
   verifyToken,
   answerRiskSurvey
 );
+
+// OBTENER RESULTADOS
+router.get("/:encuestaId/resultados", verifyToken, getSurveyResults);
 
 module.exports = router;
