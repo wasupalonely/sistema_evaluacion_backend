@@ -401,7 +401,6 @@ exports.getSurveyResults = async (req, res) => {
       // Proceso para encuestas de calidad
       const categorias = {};
       let ponderadoGlobal = 0;
-      console.log("🚀 ~ exports.getSurveyResults= ~ respuestas:", respuestas);
       // Agrupar respuestas por categorías y realizar cálculos
       for (const respuesta of respuestas) {
         const pregunta = await Pregunta.findByPk(respuesta.pregunta_id, {
