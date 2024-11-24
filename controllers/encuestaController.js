@@ -323,7 +323,6 @@ exports.getSurveyResults = async (req, res) => {
   const { encuestaId } = req.params;
 
   try {
-    // Buscar la encuesta por ID
     const encuesta = await Encuesta.findByPk(encuestaId, {
       include: [
         {
@@ -337,7 +336,6 @@ exports.getSurveyResults = async (req, res) => {
       return res.status(404).json({ error: "Encuesta no encontrada." });
     }
 
-    // Validar si hay respuestas asociadas
     const respuestas = encuesta.respuestas;
     if (respuestas.length === 0) {
       return res.status(200).json({
@@ -348,7 +346,6 @@ exports.getSurveyResults = async (req, res) => {
       });
     }
 
-    // Obtener el usuario que respondió (mismo para todas las respuestas)
     const usuario_id = respuestas[0]?.usuario_id;
 
     const tipoEncuesta = await TipoEncuesta.findByPk(encuesta.tipo_encuesta_id);
@@ -360,62 +357,106 @@ exports.getSurveyResults = async (req, res) => {
     const esEncuestaDeRiesgo = tipoEncuesta?.nombre === "Riesgos";
 
     if (esEncuestaDeRiesgo) {
-      const preguntasIds = [...new Set(respuestas.map((r) => r.pregunta_id))];
+      // Agrupación por categorías de riesgo
+      const categorias = {};
 
-      const resultados = await Promise.all(
-        preguntasIds.map(async (preguntaId) => {
-          const respuestasPregunta = respuestas.filter(
-            (r) => r.pregunta_id === preguntaId
-          );
+      for (const respuesta of respuestas) {
+        const pregunta = await Pregunta.findByPk(respuesta.pregunta_id, {
+          include: [
+            {
+              model: Categoria,
+              as: "categoria",
+            },
+          ],
+        });
 
-          // Cargar impacto asociado a la pregunta
-          const pregunta = await Pregunta.findByPk(preguntaId);
-          if (!pregunta) {
-            return {
-              preguntaId,
-              mensaje: "Pregunta no encontrada.",
-            };
-          }
+        if (!pregunta) continue;
 
-          const impacto = pregunta.impacto;
-          if (!impacto) {
-            return {
-              preguntaId,
-              mensaje: "Impacto no definido para esta pregunta.",
-            };
-          }
+        const categoria = pregunta.categoria.nombre || "Sin categoría";
+        if (!categorias[categoria]) {
+          categorias[categoria] = [];
+        }
 
-          // Calcular riesgo total y nivel de riesgo
-          const riesgos = respuestasPregunta.map((respuesta) =>
-            calcularNivelRiesgo(respuesta.valor, impacto)
-          );
+        const impacto = pregunta.impacto || {};
+        const { riesgo, nivelRiesgo } = calcularNivelRiesgo(
+          respuesta.valor,
+          impacto
+        );
 
-          const totalRiesgo = riesgos.reduce((acc, r) => acc + r.riesgo, 0);
-          const nivelRiesgo =
-            riesgos.length > 0 ? riesgos[0].nivelRiesgo : "Muy Bajo";
-
-          return {
-            preguntaId,
-            respuesta: respuestasPregunta[0].valor,
-            totalRiesgo,
-            nivelRiesgo,
-          };
-        })
-      );
+        categorias[categoria].push({
+          preguntaId: pregunta.id,
+          contenido: pregunta.contenido,
+          respuesta: respuesta.valor,
+          totalRiesgo: riesgo,
+          nivelRiesgo,
+        });
+      }
 
       return res.status(200).json({
         encuestaId: Number(encuestaId),
         usuario_id,
-        resultados,
+        categorias,
       });
     } else {
       // Proceso para encuestas de calidad
-      const promedioCalidad = calcularPromedioCalidad(respuestas);
+      const categorias = {};
+      let ponderadoGlobal = 0;
+
+      // Agrupar respuestas por categorías y realizar cálculos
+      for (const respuesta of respuestas) {
+        const pregunta = await Pregunta.findByPk(respuesta.pregunta_id);
+        if (!pregunta) continue;
+
+        const categoria = pregunta.categoria || "Sin categoría";
+        if (!categorias[categoria]) {
+          categorias[categoria] = {
+            preguntas: [],
+            maximoPuntos: 0,
+            resultadoCategoria: 0,
+            ponderado: 0,
+          };
+        }
+
+        categorias[categoria].preguntas.push({
+          preguntaId: pregunta.id,
+          texto: pregunta.texto,
+          valor: respuesta.valor,
+        });
+
+        categorias[categoria].maximoPuntos += 5; // Cada pregunta tiene un máximo de 5 puntos
+        categorias[categoria].resultadoCategoria += respuesta.valor;
+      }
+
+      // Calcular porcentajes y ponderados
+      const numeroCategorias = Object.keys(categorias).length;
+
+      for (const [categoria, data] of Object.entries(categorias)) {
+        const porcentajeCategoria =
+          (data.resultadoCategoria / data.maximoPuntos) * 100;
+
+        const ponderado =
+          ((100 / numeroCategorias) * porcentajeCategoria) / 100;
+
+        categorias[categoria].porcentajeCategoria =
+          porcentajeCategoria.toFixed(2);
+        categorias[categoria].ponderado = ponderado.toFixed(2);
+
+        ponderadoGlobal += ponderado;
+      }
+
+      // Clasificación del ponderado global
+      let nivelGlobal = "Deficiente";
+      if (ponderadoGlobal >= 90) nivelGlobal = "Excelente";
+      else if (ponderadoGlobal >= 80) nivelGlobal = "Muy Bueno";
+      else if (ponderadoGlobal >= 70) nivelGlobal = "Bueno";
+      else if (ponderadoGlobal >= 60) nivelGlobal = "Insuficiente";
 
       return res.status(200).json({
         encuestaId: Number(encuestaId),
         usuario_id,
-        promedioCalidad,
+        categorias,
+        ponderadoGlobal: ponderadoGlobal.toFixed(2),
+        nivelGlobal,
       });
     }
   } catch (error) {
