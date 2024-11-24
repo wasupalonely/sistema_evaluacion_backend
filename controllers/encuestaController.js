@@ -401,44 +401,50 @@ exports.getSurveyResults = async (req, res) => {
       // Proceso para encuestas de calidad
       const categorias = {};
       let ponderadoGlobal = 0;
-
       // Agrupar respuestas por categorías y realizar cálculos
       for (const respuesta of respuestas) {
-        const pregunta = await Pregunta.findByPk(respuesta.pregunta_id);
+        const pregunta = await Pregunta.findByPk(respuesta.pregunta_id, {
+          include: [
+            {
+              model: Categoria,
+              as: "categoria",
+            },
+          ],
+        });
         if (!pregunta) continue;
 
-        const categoria = pregunta.categoria || "Sin categoría";
+        const categoria = pregunta.categoria.nombre || "Sin categoría";
         if (!categorias[categoria]) {
           categorias[categoria] = {
             preguntas: [],
             maximoPuntos: 0,
-            resultadoCategoria: 0,
+            valor: 0,
             ponderado: 0,
           };
         }
 
         categorias[categoria].preguntas.push({
           preguntaId: pregunta.id,
-          texto: pregunta.texto,
+          contenido: pregunta.contenido,
           valor: respuesta.valor,
         });
 
-        categorias[categoria].maximoPuntos += 5; // Cada pregunta tiene un máximo de 5 puntos
-        categorias[categoria].resultadoCategoria += respuesta.valor;
+        categorias[categoria].maximoPuntos += 5;
+        categorias[categoria].valor += respuesta.valor;
       }
 
       // Calcular porcentajes y ponderados
       const numeroCategorias = Object.keys(categorias).length;
 
       for (const [categoria, data] of Object.entries(categorias)) {
-        const porcentajeCategoria =
-          (data.resultadoCategoria / data.maximoPuntos) * 100;
+        const promedioCategoria =
+          (data.valor / data.maximoPuntos) * 100;
 
         const ponderado =
-          ((100 / numeroCategorias) * porcentajeCategoria) / 100;
+          ((100 / numeroCategorias) * promedioCategoria) / 100;
 
-        categorias[categoria].porcentajeCategoria =
-          porcentajeCategoria.toFixed(2);
+        categorias[categoria].promedioCategoria =
+          promedioCategoria.toFixed(2);
         categorias[categoria].ponderado = ponderado.toFixed(2);
 
         ponderadoGlobal += ponderado;
