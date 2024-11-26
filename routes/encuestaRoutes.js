@@ -10,6 +10,8 @@ const {
   answerQualitySurvey,
   answerRiskSurvey,
   getSurveyResults,
+  getSurveysByCompany,
+  getSurveysByCompanyAndUser,
 } = require("../controllers/encuestaController");
 
 const router = express.Router();
@@ -24,13 +26,15 @@ router.get("/", verifyToken, getAllQualityModels);
 // RIESGOS
 router.get("/riesgos/categorias", verifyToken, getRisksQuestionary);
 router.post("/riesgos", verifyToken, createRisksQuestionary);
-router.post(
-  "/:encuestaId/riesgos/responder",
-  verifyToken,
-  answerRiskSurvey
-);
+router.post("/:encuestaId/riesgos/responder", verifyToken, answerRiskSurvey);
 
 // OBTENER RESULTADOS
 router.get("/:encuestaId/resultados", verifyToken, getSurveyResults);
+router.get("/empresa/:id", verifyToken, getSurveysByCompany);
+router.get(
+  "/empresa/:empresaId/usuario/:usuarioId",
+  verifyToken,
+  getSurveysByCompanyAndUser
+);
 
 module.exports = router;

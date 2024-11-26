@@ -8,6 +8,7 @@ const {
   Respuesta,
   Usuario,
   Sequelize,
+  Empresa,
 } = require("../models");
 const {
   calcularNivelRiesgo,
@@ -19,6 +20,105 @@ exports.getAllQualityModels = async (req, res) => {
     const qualityModels = await ModeloCalidad.findAll();
 
     res.status(200).json(qualityModels);
+  } catch (error) {
+    res.status(400).json({ error: error.message });
+  }
+};
+
+exports.getSurveysByCompany = async (req, res) => {
+  const { id } = req.params;
+
+  try {
+    const empresaAEncontrar = await Empresa.findOne({
+      where: { id },
+      include: {
+        model: Software,
+        as: "softwares",
+      },
+    });
+
+    if (!empresaAEncontrar) {
+      return res
+        .status(404)
+        .json({ message: "empresaAEncontrar no encontrada" });
+    }
+
+    const encuestas = await Encuesta.findAll({
+      where: {
+        software_id: empresaAEncontrar.softwares.map((software) => software.id),
+      },
+      include: [
+        {
+          model: Software,
+          as: "software",
+        },
+        {
+          model: ModeloCalidad,
+          as: "modelo_calidad",
+        },
+        {
+          model: TipoEncuesta,
+          as: "tipo_encuesta",
+        },
+        {
+          model: Usuario, // Relación con el modelo Usuario
+          as: "creador", // Alias definido en el modelo Encuesta
+          attributes: ["id", "nombre", "correo"], // Selecciona los campos necesarios del creador
+        },
+      ],
+    });
+
+    res.status(200).json(encuestas);
+  } catch (error) {
+    res.status(400).json({ error: error.message });
+  }
+};
+
+exports.getSurveysByCompanyAndUser = async (req, res) => {
+  const { empresaId, usuarioId } = req.params;
+
+  try {
+    const empresaAEncontrar = await Empresa.findOne({
+      where: { id: empresaId },
+      include: {
+        model: Software,
+        as: "softwares",
+      },
+    });
+
+    if (!empresaAEncontrar) {
+      return res
+        .status(404)
+        .json({ message: "empresaAEncontrar no encontrada" });
+    }
+
+    const encuestas = await Encuesta.findAll({
+      where: {
+        software_id: empresaAEncontrar.softwares.map((software) => software.id),
+        creador_id: usuarioId,
+      },
+      include: [
+        {
+          model: Software,
+          as: "software",
+        },
+        {
+          model: ModeloCalidad,
+          as: "modelo_calidad",
+        },
+        {
+          model: TipoEncuesta,
+          as: "tipo_encuesta",
+        },
+        {
+          model: Usuario, // Relación con el modelo Usuario
+          as: "creador", // Alias definido en el modelo Encuesta
+          attributes: ["id", "nombre", "correo"], // Selecciona los campos necesarios del creador
+        },
+      ],
+    });
+
+    res.status(200).json(encuestas);
   } catch (error) {
     res.status(400).json({ error: error.message });
   }
@@ -437,14 +537,11 @@ exports.getSurveyResults = async (req, res) => {
       const numeroCategorias = Object.keys(categorias).length;
 
       for (const [categoria, data] of Object.entries(categorias)) {
-        const promedioCategoria =
-          (data.valor / data.maximoPuntos) * 100;
+        const promedioCategoria = (data.valor / data.maximoPuntos) * 100;
 
-        const ponderado =
-          ((100 / numeroCategorias) * promedioCategoria) / 100;
+        const ponderado = ((100 / numeroCategorias) * promedioCategoria) / 100;
 
-        categorias[categoria].promedioCategoria =
-          promedioCategoria.toFixed(2);
+        categorias[categoria].promedioCategoria = promedioCategoria.toFixed(2);
         categorias[categoria].ponderado = ponderado.toFixed(2);
 
         ponderadoGlobal += ponderado;
