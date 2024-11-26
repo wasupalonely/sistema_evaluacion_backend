@@ -8,6 +8,11 @@ module.exports = (sequelize, DataTypes) => {
      * The `models/index` file will call this method automatically.
      */
     static associate(models) {
+      Encuesta.belongsTo(models.Usuario, {
+        foreignKey: "creador_id",
+        as: "creador",
+      });
+
       Encuesta.belongsTo(models.TipoEncuesta, {
         foreignKey: "tipo_encuesta_id",
         as: "tipo_encuesta",
@@ -26,7 +31,7 @@ module.exports = (sequelize, DataTypes) => {
       Encuesta.hasMany(models.Respuesta, {
         foreignKey: "encuesta_id",
         as: "respuestas",
-        onDelete: 'CASCADE',
+        onDelete: "CASCADE",
       });
     }
   }
@@ -41,8 +46,8 @@ module.exports = (sequelize, DataTypes) => {
       sequelize,
       modelName: "Encuesta",
       timestamps: true, // Activa createdAt y updatedAt
-      createdAt: 'createdAt', // Sequelize agregará esta columna automáticamente
-      updatedAt: 'updatedAt', // Sequelize agregará esta columna automáticamente
+      createdAt: "createdAt", // Sequelize agregará esta columna automáticamente
+      updatedAt: "updatedAt", // Sequelize agregará esta columna automáticamente
     }
   );
   return Encuesta;
